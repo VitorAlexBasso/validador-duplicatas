@@ -1,10 +1,11 @@
 import streamlit as st
 import pandas as pd
+from io import BytesIO
 
-st.set_page_config(page_title="Validador de Duplicatas", layout="centered")
+st.set_page_config(page_title="Duplicatas com Detalhes", layout="centered")
 
-st.title("🔍 Validador de Nomes e CNPJs Duplicados")
-st.write("Faça o upload de uma planilha `.xlsx` para detectar **nomes e CNPJs duplicados**.")
+st.title("🔍 Validador de Nomes Duplicados com Detalhes")
+st.write("Identifica nomes duplicados (coluna D) e mostra seus respectivos códigos (coluna A).")
 
 uploaded_file = st.file_uploader("📎 Envie sua planilha Excel (.xlsx)", type="xlsx")
 
@@ -14,25 +15,34 @@ if uploaded_file:
 
         st.success("✅ Planilha carregada com sucesso!")
 
-        df["Nome_normalizado"] = df["Nome"].astype(str).str.strip().str.upper()
+        # Normalização do nome
+        df["Nome_normalizado"] = df.iloc[:, 3].astype(str).str.strip().str.upper()  # Coluna D
+        df["Código"] = df.iloc[:, 0]  # Coluna A
+
+        # Filtra os nomes que aparecem mais de uma vez
         nomes_duplicados = df[df.duplicated("Nome_normalizado", keep=False)]
 
-        df["CNPJ_normalizado"] = df["CPF/CNPJ"].astype(str).str.replace(r"\\D", "", regex=True)
-        cnpjs_duplicados = df[df["CNPJ_normalizado"].duplicated(keep=False) & df["CNPJ_normalizado"].str.len() > 0]
+        # Resultado final apenas com as colunas desejadas
+        resultado = nomes_duplicados[[df.columns[0], df.columns[3]]].rename(columns={
+            df.columns[0]: "Código",
+            df.columns[3]: "Nome"
+        })
 
-        st.subheader("📛 Nomes Duplicados")
-        st.dataframe(nomes_duplicados[["Nome", "CPF/CNPJ"]].drop_duplicates())
+        st.subheader("📋 Cadastros Duplicados Encontrados")
+        st.dataframe(resultado)
 
-        st.subheader("🔢 CNPJs Duplicados")
-        st.dataframe(cnpjs_duplicados[["Nome", "CPF/CNPJ"]].drop_duplicates())
+        # Geração do Excel para download
+        output = BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            resultado.to_excel(writer, index=False, sheet_name="Duplicados")
+        output.seek(0)
 
-        resultado_final = pd.concat([
-            nomes_duplicados[["Nome", "CPF/CNPJ"]],
-            cnpjs_duplicados[["Nome", "CPF/CNPJ"]]
-        ]).drop_duplicates()
-
-        csv = resultado_final.to_csv(index=False).encode("utf-8")
-        st.download_button("📥 Baixar resultados em CSV", csv, "duplicatas.csv", "text/csv")
+        st.download_button(
+            label="📥 Baixar resultado em Excel",
+            data=output,
+            file_name="duplicados.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
 
     except Exception as e:
         st.error(f"Erro ao processar a planilha: {e}")
