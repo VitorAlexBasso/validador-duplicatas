@@ -19,8 +19,8 @@ if uploaded_file:
         df["Nome_normalizado"] = df.iloc[:, 3].astype(str).str.strip().str.upper()  # Coluna D
         df["Código"] = df.iloc[:, 0]  # Coluna A
 
-        # Filtra os nomes que aparecem mais de uma vez
-        nomes_duplicados = df[df.duplicated("Nome_normalizado", keep=False)]
+        # Filtra os nomes que aparecem mais de uma vez e mantém apenas o primeiro
+        nomes_duplicados = df[df.duplicated("Nome_normalizado", keep='first')]
 
         # Resultado final apenas com as colunas desejadas
         resultado = nomes_duplicados[[df.columns[0], df.columns[3]]].rename(columns={
